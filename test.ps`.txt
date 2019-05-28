@@ -1,0 +1,18 @@
+function parseVMdetails($properties)
+{
+    # it's a NoteProperty!    
+    $VMdata = "" | Select VMName, CPU,Memory, StorageMB
+
+    $properties | Get-Member -Type Noteproperty | ForEach-Object {
+        if ($_.name -eq "vm.name")
+        {
+            $VMData.VMName = $_.value
+        }
+        if ($_.vm.storageAllocationMb -eq "16384")
+        {
+
+        }
+        
+
+    }
+}

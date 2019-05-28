@@ -14,15 +14,27 @@ function parseVMdetails($vmProperties)
     return $VMdata
 }
 
-$vCloudURL = "https://vcloud.ldc.int/api/query?type=adminEvent&sortDesc=timeStamp&pageSize=50"
-$accessToken = "faaf7f3b9ffd4f0cbc941ab726b26e55"
+$vCloudURL = "https://192.168.11.151/api/query?type=adminEvent&sortDesc=timeStamp&pageSize=50"
+$accessToken = "adbb4fc25ff64e4381ebdf7cb1333e3e"
 
 $header = @{}
     $header.Add("Accept",'application/*+xml;version=31.0')
     $header.Add("x-vcloud-authorization",$accessToken)
 
-[Net.ServicePointManager]::SecurityProtocol = "tls12, tls11, tls"
-#$r = Invoke-WebRequest -Uri $vCloudURL -Method Get -Headers $header -ContentType "application/xml"
+#[Net.ServicePointManager]::SecurityProtocol = "tls12, tls11, tls"
+add-type @"
+    using System.Net;
+    using System.Security.Cryptography.X509Certificates;
+    public class TrustAllCertsPolicy : ICertificatePolicy {
+        public bool CheckValidationResult(
+            ServicePoint srvPoint, X509Certificate certificate,
+            WebRequest request, int certificateProblem) {
+            return true;
+        }
+    }
+"@
+[System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
+$r = Invoke-WebRequest -Uri $vCloudURL -Method Get -Headers $header -ContentType "application/xml"
 
 $vmEvents = ([xml]$r.Content).QueryResultRecords.AdminEventRecord | where {$_.entityType -eq "vm"}
 #$vmEvents = ([xml]$r.Content).QueryResultRecords.AdminEventRecord | where {$_.entityName -in ('vdcInstantiateVapp','vappUpdateVm','vappUndeployPowerOff')}
@@ -30,9 +42,10 @@ $vmEvents = ([xml]$r.Content).QueryResultRecords.AdminEventRecord | where {$_.en
 $report = @()
 foreach ($vmEvent in $vmEvents)
 {
-    $data = ""| Select Date, OrgName, vmName, CPU, Memory, Storage #,OrgVDC
+    $data = ""| Select Date, OrgName, vmName, entity, CPU, Memory, Storage #,OrgVDC
     $data.Date = '{0:yyyy-MM-dd hh:mm:ss}' -f [datetime] $vmEvent.timeStamp
     $data.OrgName = $vmEvent.orgName
+    $data.entity = $vmEvent.entity
     # parse VM Details
     #write-host $vmEvent.details
     $q = $vmEvent.details
